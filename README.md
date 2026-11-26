@@ -1,7 +1,5 @@
 # KaleidoSnap
 
-A client-side browser Purikura photobooth built with **Vite + React + TypeScript**. Everything runs locally in your browser—zero backend, zero database, and zero cloud photo uploads.
-
 ## How to Use
 
 1. **Allow Camera Access** — Open the app and grant webcam permission to start the live viewfinder.
@@ -34,6 +32,3 @@ Build for production:
 npm run build
 ```
 
-## GitHub Pages Deployment
-
-This repository includes `.github/workflows/deploy.yml`, which automatically type-checks, builds `dist/`, and deploys to GitHub Pages on every push to `main`. In your GitHub repository settings, set **Settings → Pages → Source** to **GitHub Actions**.
