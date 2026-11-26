@@ -1,0 +1,19 @@
+# Dependencies & build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Logs & environment
+*.log
+.env*
+
+# OS & editor files
+.DS_Store
+Thumbs.db
+
+# Local scratch & agent files
+draft.txt
+PLAN_HANDOUT.md
+.agents/
+.aiignore
