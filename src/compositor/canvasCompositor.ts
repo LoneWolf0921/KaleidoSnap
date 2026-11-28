@@ -2,9 +2,11 @@ import { buildCssFilterString, getWarmthOverlayColor } from '../config/filters';
 import { getStickerById } from '../config/stickers';
 import type {
   CapturedFrame,
+  DateFormatId,
   ExportFormat,
   FilterCalibration,
   FilterId,
+  FooterFontStyle,
   FrameStyle,
   LayoutDefinition,
   PlacedSticker,
@@ -245,6 +247,134 @@ function drawFramePattern(
     ctx.moveTo(Math.round(w * 0.045), 0);
     ctx.lineTo(Math.round(w * 0.045), h);
     ctx.stroke();
+  } else if (frame.pattern === 'pixel-8bit') {
+    const px = Math.max(8, Math.round(w * 0.01));
+    // Outer pixel arcade border
+    ctx.fillStyle = frame.accentColor;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(px * 2, px * 2, w - px * 4, px);
+    ctx.fillRect(px * 2, h - px * 3, w - px * 4, px);
+    ctx.fillRect(px * 2, px * 2, px, h - px * 4);
+    ctx.fillRect(w - px * 3, px * 2, px, h - px * 4);
+
+    // Stepped pixel-art gold corners
+    ctx.fillStyle = frame.textColor;
+    ctx.globalAlpha = 0.95;
+    const drawPixelCorner = (cx: number, cy: number, sx: number, sy: number) => {
+      ctx.fillRect(cx, cy, px * 3 * sx, px * sy);
+      ctx.fillRect(cx, cy, px * sx, px * 3 * sy);
+      ctx.fillRect(cx + px * 2 * sx, cy + px * 2 * sy, px * sx, px * sy);
+    };
+    drawPixelCorner(px, px, 1, 1);
+    drawPixelCorner(w - px, px, -1, 1);
+    drawPixelCorner(px, h - px, 1, -1);
+    drawPixelCorner(w - px, h - px, -1, -1);
+
+    // Neon pixel confetti squares in margins
+    const confettiColors = ['#EF4444', '#FDE047', '#22D3EE', '#A855F7'];
+    for (let i = 0; i < 28; i++) {
+      const cx = ((i * 211 + 47) % (w - px * 10)) + px * 5;
+      const cy = ((i * 317 + 71) % (h - px * 10)) + px * 5;
+      ctx.fillStyle = confettiColors[i % confettiColors.length];
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(cx, cy, px, px);
+    }
+  } else if (frame.pattern === 'pixel-cafe') {
+    const sq = Math.max(12, Math.round(w * 0.018));
+    // Warm cream & caramel/espresso checkered outer border
+    for (let x = 0; x < w; x += sq) {
+      const col = Math.floor(x / sq);
+      ctx.fillStyle = col % 2 === 0 ? '#7C4A2D' : '#E7C9A9';
+      ctx.globalAlpha = 0.72;
+      ctx.fillRect(x, 0, sq, sq);
+      ctx.fillRect(x, h - sq, sq, sq);
+    }
+    for (let y = sq; y < h - sq; y += sq) {
+      const row = Math.floor(y / sq);
+      ctx.fillStyle = row % 2 === 0 ? '#7C4A2D' : '#E7C9A9';
+      ctx.globalAlpha = 0.72;
+      ctx.fillRect(0, y, sq, sq);
+      ctx.fillRect(w - sq, y, sq, sq);
+    }
+
+    // Tiny pixel coffee & heart accents in footer corners
+    const ps = Math.max(4, Math.round(sq * 0.32));
+    const drawMiniHeart = (ox: number, oy: number) => {
+      const rows = ['.#.#.', '#####', '.###.', '..#..'];
+      ctx.fillStyle = '#C26D27';
+      ctx.globalAlpha = 0.85;
+      for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < rows[r].length; c++) {
+          if (rows[r][c] === '#') {
+            ctx.fillRect(ox + c * ps, oy + r * ps, ps, ps);
+          }
+        }
+      }
+    };
+    drawMiniHeart(sq * 2, h - layout.footerHeight * 0.55);
+    drawMiniHeart(w - sq * 2 - ps * 5, h - layout.footerHeight * 0.55);
+  } else if (frame.pattern === 'holo-gradient') {
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, '#F5D0FE');
+    grad.addColorStop(0.28, '#E0F2FE');
+    grad.addColorStop(0.58, '#FCE7F3');
+    grad.addColorStop(0.82, '#DCFCE7');
+    grad.addColorStop(1, '#DDD6FE');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle iridescent diagonal sheen
+    const sheen = ctx.createLinearGradient(0, h * 0.2, w, h * 0.8);
+    sheen.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    sheen.addColorStop(0.5, 'rgba(255, 255, 255, 0.35)');
+    sheen.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(0, 0, w, h);
+
+    // 4-point chrome sparkles
+    const sparkleCount = 26;
+    for (let i = 0; i < sparkleCount; i++) {
+      const px = ((i * 239 + 41) % (w - 60)) + 30;
+      const py = ((i * 359 + 53) % (h - 60)) + 30;
+      const r = (i % 3) * 4 + 6;
+      ctx.fillStyle = i % 2 === 0 ? '#FFFFFF' : '#E879F9';
+      ctx.globalAlpha = i % 2 === 0 ? 0.85 : 0.45;
+      ctx.beginPath();
+      ctx.moveTo(px, py - r * 1.8);
+      ctx.lineTo(px + r * 0.4, py - r * 0.4);
+      ctx.lineTo(px + r * 1.8, py);
+      ctx.lineTo(px + r * 0.4, py + r * 0.4);
+      ctx.lineTo(px, py + r * 1.8);
+      ctx.lineTo(px - r * 0.4, py + r * 0.4);
+      ctx.lineTo(px - r * 1.8, py);
+      ctx.lineTo(px - r * 0.4, py - r * 0.4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (frame.pattern === 'polaroid-tape') {
+    // Subtle warm paper border
+    ctx.strokeStyle = '#E5DEC9';
+    ctx.lineWidth = Math.max(4, Math.round(w * 0.008));
+    ctx.strokeRect(0, 0, w, h);
+
+    // Decorative corner masking-tape strips
+    const tapeW = Math.round(w * 0.14);
+    const tapeH = Math.round(w * 0.042);
+    const drawTape = (cx: number, cy: number, angle: number, color: string) => {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.72;
+      ctx.fillRect(-tapeW / 2, -tapeH / 2, tapeW, tapeH);
+      ctx.strokeStyle = 'rgba(120, 96, 68, 0.25)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-tapeW / 2, -tapeH / 2, tapeW, tapeH);
+      ctx.restore();
+    };
+    drawTape(w * 0.08, w * 0.05, -0.58, '#E6C99C');
+    drawTape(w * 0.92, w * 0.05, 0.58, '#E6C99C');
+    drawTape(w * 0.91, h - w * 0.05, -0.52, '#D8C3A5');
   }
   ctx.restore();
 }
@@ -350,6 +480,45 @@ function applySignatureFilterOverlay(
   ctx.restore();
 }
 
+export function formatStripDate(
+  date: Date,
+  format: DateFormatId = 'mm.dd.yyyy'
+): string {
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const yyyy = String(date.getFullYear());
+
+  switch (format) {
+    case 'mm-dd-yyyy':
+      return `${mm}-${dd}-${yyyy}`;
+    case 'dd.mm.yyyy':
+      return `${dd}.${mm}.${yyyy}`;
+    case 'yyyy-mm-dd':
+      return `${yyyy}-${mm}-${dd}`;
+    case 'short-month':
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    case 'mm.dd.yyyy':
+    default:
+      return `${mm}.${dd}.${yyyy}`;
+  }
+}
+
+export function getFooterFontFamily(style: FooterFontStyle = 'modern'): string {
+  switch (style) {
+    case 'mono':
+      return 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+    case 'handwritten':
+      return '"Segoe Print", "Bradley Hand", "Comic Sans MS", cursive';
+    case 'modern':
+    default:
+      return 'ui-sans-serif, system-ui, -apple-system, sans-serif';
+  }
+}
+
 export interface RenderStripOptions {
   layout: LayoutDefinition;
   frames: CapturedFrame[];
@@ -357,7 +526,9 @@ export interface RenderStripOptions {
   calibration: FilterCalibration;
   frameStyle: FrameStyle;
   footerText: string;
+  footerFont?: FooterFontStyle;
   showDate: boolean;
+  dateFormat?: DateFormatId;
   stickers: PlacedSticker[];
 }
 
@@ -365,7 +536,18 @@ export async function renderStripToCanvas(
   canvas: HTMLCanvasElement,
   options: RenderStripOptions
 ): Promise<void> {
-  const { layout, frames, filterId, calibration, frameStyle, footerText, showDate, stickers } = options;
+  const {
+    layout,
+    frames,
+    filterId,
+    calibration,
+    frameStyle,
+    footerText,
+    footerFont = 'modern',
+    showDate,
+    dateFormat = 'mm.dd.yyyy',
+    stickers,
+  } = options;
   canvas.width = layout.canvasWidth;
   canvas.height = layout.canvasHeight;
 
@@ -447,22 +629,19 @@ export async function renderStripToCanvas(
   const centerX = layout.canvasWidth / 2;
   const title = footerText.trim() || 'KaleidoSnap';
   const fontSize = Math.round(layout.canvasWidth * 0.036);
+  const fontFamily = getFooterFontFamily(footerFont);
 
   ctx.save();
   ctx.fillStyle = frameStyle.textColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+  ctx.font = `700 ${fontSize}px ${fontFamily}`;
 
   if (showDate) {
-    const dateStr = new Date().toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    const dateStr = formatStripDate(new Date(), dateFormat);
     ctx.fillText(title, centerX, footerTop + layout.footerHeight * 0.36);
     ctx.globalAlpha = 0.72;
-    ctx.font = `500 ${Math.round(fontSize * 0.56)}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+    ctx.font = `500 ${Math.round(fontSize * 0.56)}px ${fontFamily}`;
     ctx.fillText(dateStr, centerX, footerTop + layout.footerHeight * 0.68);
   } else {
     ctx.fillText(title, centerX, footerTop + layout.footerHeight * 0.5);

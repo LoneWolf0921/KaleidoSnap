@@ -138,6 +138,18 @@ export function playThemeInteractionSound(theme: ThemeMode, enabled: boolean): v
       playTone(340, 0.065, 'sine', 0.12, 0, 980);
       playTone(1480, 0.05, 'sine', 0.055, 0.045, 1760);
       break;
+    case 'retro-8bit':
+      // 8-bit coin / power-up chiptune chime
+      playTone(987.77, 0.06, 'square', 0.055, 0);
+      playTone(1318.51, 0.14, 'square', 0.06, 0.055);
+      playTone(1567.98, 0.08, 'square', 0.04, 0.11);
+      break;
+    case 'pixel-cafe':
+      // Cozy cafe service-bell chime + warm marimba undertone
+      playTone(1318.51, 0.24, 'sine', 0.09, 0);
+      playTone(2637.02, 0.16, 'sine', 0.035, 0.005);
+      playTone(659.25, 0.14, 'triangle', 0.065, 0.02);
+      break;
   }
 }
 
@@ -147,6 +159,16 @@ export function playCountdownTick(
   theme: ThemeMode = 'light'
 ): void {
   if (!enabled) return;
+  if (theme === 'retro-8bit') {
+    const freq = secondsLeft <= 1 ? 1046.5 : secondsLeft === 2 ? 783.99 : 587.33;
+    playTone(freq, 0.09, 'square', 0.06);
+    return;
+  }
+  if (theme === 'pixel-cafe') {
+    const freq = secondsLeft <= 1 ? 659.25 : secondsLeft === 2 ? 523.25 : 440;
+    playTone(freq, 0.12, 'triangle', 0.095);
+    return;
+  }
   const baseFreq = secondsLeft <= 1 ? 880 : secondsLeft === 2 ? 660 : 523.25;
   const oscType: OscillatorType =
     theme === 'midnight-arcade' ? 'square' : theme === 'matcha-cream' ? 'sine' : 'triangle';
@@ -181,6 +203,16 @@ export function playShutterClick(enabled: boolean, theme: ThemeMode = 'light'): 
       playTone(440, 0.07, 'sine', 0.12, 0, 1174.66);
       playTone(1567.98, 0.1, 'sine', 0.08, 0.055);
       break;
+    case 'retro-8bit':
+      playNoiseBurst(0.02, 2600, 'highpass', 0.075, 0);
+      playTone(880, 0.055, 'square', 0.06, 0, 330);
+      playTone(1318.51, 0.09, 'square', 0.055, 0.045);
+      break;
+    case 'pixel-cafe':
+      playNoiseBurst(0.018, 1500, 'bandpass', 0.05, 0);
+      playTone(523.25, 0.11, 'triangle', 0.1, 0.01);
+      playTone(1046.5, 0.16, 'sine', 0.075, 0.055);
+      break;
     case 'light':
     default:
       playNoiseBurst(0.022, 1800, 'bandpass', 0.065, 0, 3200);
@@ -196,7 +228,7 @@ export function playStickerPop(enabled: boolean, theme: ThemeMode = 'light'): vo
     playTone(720, 0.07, 'sine', 0.1, 0, 1180);
     return;
   }
-  if (theme === 'midnight-arcade') {
+  if (theme === 'midnight-arcade' || theme === 'retro-8bit') {
     playTone(660, 0.06, 'square', 0.055, 0, 1100);
     return;
   }
@@ -204,11 +236,30 @@ export function playStickerPop(enabled: boolean, theme: ThemeMode = 'light'): vo
     playTone(739.99, 0.11, 'sine', 0.09, 0, 987.77);
     return;
   }
+  if (theme === 'pixel-cafe') {
+    playTone(523.25, 0.09, 'triangle', 0.1, 0, 783.99);
+    return;
+  }
   playTone(587.33, 0.08, 'sine', 0.11, 0, 987.77);
 }
 
 export function playSessionComplete(enabled: boolean, theme: ThemeMode = 'light'): void {
   if (!enabled) return;
+  if (theme === 'retro-8bit') {
+    const fanfare = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+    fanfare.forEach((freq, i) => {
+      playTone(freq, i === fanfare.length - 1 ? 0.22 : 0.09, 'square', 0.058, i * 0.065);
+    });
+    return;
+  }
+  if (theme === 'pixel-cafe') {
+    const cozyNotes = [440, 554.37, 659.25, 880];
+    cozyNotes.forEach((freq, i) => {
+      playTone(freq, 0.2, 'triangle', 0.085, i * 0.085);
+    });
+    playTone(1318.51, 0.26, 'sine', 0.05, 0.26);
+    return;
+  }
   const notes =
     theme === 'matcha-cream'
       ? [587.33, 739.99, 880, 1174.66]

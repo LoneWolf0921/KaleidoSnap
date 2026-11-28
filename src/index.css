@@ -87,6 +87,32 @@
   --ks-accent-soft: rgb(139 92 246 / 0.12);
 }
 
+[data-theme="retro-8bit"] {
+  --ks-bg: #121426;
+  --ks-surface: #1c203c;
+  --ks-recessed: #0d0f1d;
+  --ks-ink: #f8fafc;
+  --ks-muted: #94a3c4;
+  --ks-border: #2e3561;
+  --ks-border-strong: #454f8c;
+  --ks-accent: #ef4444;
+  --ks-accent-hover: #f87171;
+  --ks-accent-soft: rgb(239 68 68 / 0.16);
+}
+
+[data-theme="pixel-cafe"] {
+  --ks-bg: #fbf4e9;
+  --ks-surface: #fffaf3;
+  --ks-recessed: #f2e4d0;
+  --ks-ink: #3b2314;
+  --ks-muted: #7c5840;
+  --ks-border: #e4cfb6;
+  --ks-border-strong: #cfa982;
+  --ks-accent: #c26d27;
+  --ks-accent-hover: #a15519;
+  --ks-accent-soft: rgb(194 109 39 / 0.14);
+}
+
 @layer base {
   html {
     color-scheme: light dark;

@@ -93,6 +93,183 @@ interface FizzRing {
   color: string;
 }
 
+interface PixelSpriteItem {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  pixelSize: number;
+  kind: 'gamepad' | 'heart' | 'coin' | 'mushroom' | 'coffee' | 'croissant' | 'boba' | 'bell';
+  popScale: number;
+  phase: number;
+}
+
+const PIXEL_SPRITES: Record<PixelSpriteItem['kind'], { rows: string[]; palette: Record<string, string> }> = {
+  gamepad: {
+    rows: [
+      '..........',
+      '.########.',
+      '#DDDDDDDD#',
+      '#D+DDDABD#',
+      '#+++DDABD#',
+      '#D+DDDDDD#',
+      '#DDDDDDDD#',
+      '.########.',
+    ],
+    palette: {
+      '#': '#94a3c4',
+      D: '#1e293b',
+      '+': '#fbbf24',
+      A: '#ef4444',
+      B: '#f87171',
+    },
+  },
+  heart: {
+    rows: [
+      '.##..##.',
+      '#WW##RR#',
+      '#WRRRRR#',
+      '#RRRRRR#',
+      '.#RRRR#.',
+      '..#RR#..',
+      '...##...',
+    ],
+    palette: {
+      '#': '#7f1d1d',
+      R: '#ef4444',
+      W: '#fecaca',
+    },
+  },
+  coin: {
+    rows: [
+      '..####..',
+      '.#GGGG#.',
+      '#GYYYYG#',
+      '#GY##YG#',
+      '#GY##YG#',
+      '#GYYYYG#',
+      '.#GGGG#.',
+      '..####..',
+    ],
+    palette: {
+      '#': '#b45309',
+      G: '#f59e0b',
+      Y: '#fde047',
+    },
+  },
+  mushroom: {
+    rows: [
+      '..####..',
+      '.#RRRR#.',
+      '#RWWRWR#',
+      '#RRRRRR#',
+      '.#SSSS#.',
+      '.#S##S#.',
+      '..####..',
+    ],
+    palette: {
+      '#': '#1e293b',
+      R: '#ef4444',
+      W: '#f8fafc',
+      S: '#fde68a',
+    },
+  },
+  coffee: {
+    rows: [
+      '..S..S..',
+      '...S..S.',
+      '.######.',
+      '#CCCCCC#',
+      '#CBBBB###',
+      '#CCCCCC#',
+      '.######.',
+    ],
+    palette: {
+      S: 'rgba(194, 109, 39, 0.55)',
+      '#': '#5c3317',
+      C: '#fffaf3',
+      B: '#92400e',
+    },
+  },
+  croissant: {
+    rows: [
+      '...##...',
+      '.##GG##.',
+      '#GYYYYG#',
+      '#G#GG#G#',
+      '.##..##.',
+    ],
+    palette: {
+      '#': '#92400e',
+      G: '#d97706',
+      Y: '#fbbf24',
+    },
+  },
+  boba: {
+    rows: [
+      '....#...',
+      '...#....',
+      '.######.',
+      '#MMMMMM#',
+      '#MMMMMM#',
+      '#MBBMBM#',
+      '.######.',
+    ],
+    palette: {
+      '#': '#5c3317',
+      M: '#a3be8c',
+      B: '#3b2314',
+    },
+  },
+  bell: {
+    rows: [
+      '...##...',
+      '..#GG#..',
+      '.#GYYG#.',
+      '.#GGGG#.',
+      '########',
+      '..####..',
+    ],
+    palette: {
+      '#': '#78350f',
+      G: '#f59e0b',
+      Y: '#fef08a',
+    },
+  },
+};
+
+function drawPixelSprite(
+  ctx: CanvasRenderingContext2D,
+  item: PixelSpriteItem,
+  alpha: number
+): void {
+  const sprite = PIXEL_SPRITES[item.kind];
+  const cols = sprite.rows[0]?.length ?? 8;
+  const rows = sprite.rows.length;
+  const ps = item.pixelSize;
+  const w = cols * ps;
+  const h = rows * ps;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(item.x, item.y);
+  ctx.scale(item.popScale, item.popScale);
+  ctx.translate(-w / 2, -h / 2);
+
+  for (let r = 0; r < rows; r++) {
+    const row = sprite.rows[r];
+    for (let c = 0; c < row.length; c++) {
+      const ch = row[c];
+      if (ch === '.') continue;
+      const color = sprite.palette[ch];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.floor(c * ps), Math.floor(r * ps), Math.ceil(ps), Math.ceil(ps));
+    }
+  }
+  ctx.restore();
+}
+
 export function DesktopBackdrop({
   theme,
   animationsEnabled,
@@ -208,6 +385,30 @@ export function DesktopBackdrop({
 
     const rings: FizzRing[] = [];
 
+    const retroKinds: PixelSpriteItem['kind'][] = ['gamepad', 'heart', 'coin', 'mushroom'];
+    const retroItems: PixelSpriteItem[] = Array.from({ length: 18 }, (_, i) => ({
+      x: (i * 197 + 40) % width,
+      y: (i * 263 + 40) % height,
+      vx: (i % 2 === 0 ? 1 : -1) * (0.4 + (i % 3) * 0.2),
+      vy: (i % 3 === 0 ? 1 : -1) * (0.3 + (i % 4) * 0.15),
+      pixelSize: 3 + (i % 2),
+      kind: retroKinds[i % retroKinds.length],
+      popScale: 1,
+      phase: i * 0.7,
+    }));
+
+    const cafeKinds: PixelSpriteItem['kind'][] = ['coffee', 'croissant', 'boba', 'bell'];
+    const cafeItems: PixelSpriteItem[] = Array.from({ length: 18 }, (_, i) => ({
+      x: (i * 181 + 35) % width,
+      y: (i * 239 + 35) % height,
+      vx: (i % 2 === 0 ? 1 : -1) * (0.28 + (i % 3) * 0.14),
+      vy: (i % 3 === 0 ? 1 : -1) * (0.22 + (i % 4) * 0.12),
+      pixelSize: 3 + (i % 2),
+      kind: cafeKinds[i % cafeKinds.length],
+      popScale: 1,
+      phase: i * 0.85,
+    }));
+
     function handlePointerMove(e: PointerEvent): void {
       pointer.vx = e.clientX - pointer.x;
       pointer.vy = e.clientY - pointer.y;
@@ -262,6 +463,24 @@ export function DesktopBackdrop({
             if (now - lastHoverSfxAt > 220) {
               lastHoverSfxAt = now;
               playThemeInteractionSound('lavender-soda', soundEnabledRef.current);
+            }
+          }
+        }
+      }
+
+      if (theme === 'retro-8bit' || theme === 'pixel-cafe') {
+        const now = performance.now();
+        const activeItems = theme === 'retro-8bit' ? retroItems : cafeItems;
+        for (const item of activeItems) {
+          const dist = Math.hypot(item.x - pointer.x, item.y - pointer.y);
+          if (dist < item.pixelSize * 6 + 26 && item.popScale < 1.15) {
+            item.popScale = 1.38;
+            const safeDist = Math.max(1, dist);
+            item.vx += ((item.x - pointer.x) / safeDist) * 1.15;
+            item.vy += ((item.y - pointer.y) / safeDist) * 1.15;
+            if (now - lastHoverSfxAt > 280) {
+              lastHoverSfxAt = now;
+              playThemeInteractionSound(theme, soundEnabledRef.current);
             }
           }
         }
@@ -372,6 +591,58 @@ export function DesktopBackdrop({
           alpha: 0.8,
           color: '#8b5cf6',
         });
+      } else if (theme === 'retro-8bit') {
+        for (const item of retroItems) {
+          const dist = Math.hypot(item.x - cx, item.y - cy);
+          if (dist < 110) {
+            item.popScale = 1.5;
+            const safeDist = Math.max(1, dist);
+            item.vx += ((item.x - cx) / safeDist) * 2.1;
+            item.vy += ((item.y - cy) / safeDist) * 2.1;
+          }
+        }
+        for (let k = 0; k < 8; k++) {
+          const a = (Math.PI * 2 * k) / 8;
+          splashes.push({
+            x: cx,
+            y: cy,
+            vx: Math.cos(a) * 2.8,
+            vy: Math.sin(a) * 2.8,
+            life: 1,
+            color: k % 2 === 0 ? '#ef4444' : '#fde047',
+            size: 3.5,
+          });
+        }
+      } else if (theme === 'pixel-cafe') {
+        for (const item of cafeItems) {
+          const dist = Math.hypot(item.x - cx, item.y - cy);
+          if (dist < 110) {
+            item.popScale = 1.45;
+            const safeDist = Math.max(1, dist);
+            item.vx += ((item.x - cx) / safeDist) * 1.8;
+            item.vy += ((item.y - cy) / safeDist) * 1.8;
+          }
+        }
+        rings.push({
+          x: cx,
+          y: cy,
+          r: 6,
+          maxR: 72,
+          alpha: 0.65,
+          color: '#c26d27',
+        });
+        for (let k = 0; k < 6; k++) {
+          const a = (Math.PI * 2 * k) / 6;
+          splashes.push({
+            x: cx,
+            y: cy,
+            vx: Math.cos(a) * 2.1,
+            vy: Math.sin(a) * 2.1,
+            life: 1,
+            color: k % 2 === 0 ? '#c26d27' : '#f59e0b',
+            size: 3,
+          });
+        }
       }
     }
 
@@ -761,6 +1032,66 @@ export function DesktopBackdrop({
           ctx.arc(b.x - b.r * 0.32, b.y - b.r * 0.32, b.r * 0.22, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
+        }
+      } else if (theme === 'retro-8bit' || theme === 'pixel-cafe') {
+        const activeItems = theme === 'retro-8bit' ? retroItems : cafeItems;
+        const spriteAlpha = theme === 'retro-8bit' ? 0.55 : 0.65;
+
+        if (theme === 'retro-8bit') {
+          ctx.fillStyle = 'rgba(148, 163, 196, 0.08)';
+          for (let gx = 16; gx < width; gx += 48) {
+            for (let gy = 16; gy < height; gy += 48) {
+              ctx.fillRect(gx, gy, 2, 2);
+            }
+          }
+        } else {
+          ctx.fillStyle = 'rgba(194, 109, 39, 0.08)';
+          for (let gx = 20; gx < width; gx += 44) {
+            for (let gy = 20; gy < height; gy += 44) {
+              ctx.fillRect(gx, gy, 3, 3);
+            }
+          }
+        }
+
+        for (const item of activeItems) {
+          if (animationsEnabled) {
+            if (pointer.active) {
+              const dx = item.x - pointer.x;
+              const dy = item.y - pointer.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist < item.pixelSize * 6 + 60 && dist > 1) {
+                item.vx += (dx / dist) * 0.16;
+                item.vy += (dy / dist) * 0.16;
+              }
+            }
+            item.x += item.vx;
+            item.y += item.vy;
+            item.vx *= 0.992;
+            item.vy *= 0.992;
+            if (Math.hypot(item.vx, item.vy) < 0.32) {
+              item.vx += Math.cos(item.phase + tick * 0.012) * 0.018;
+              item.vy += Math.sin(item.phase + tick * 0.012) * 0.018;
+            }
+            item.popScale += (1 - item.popScale) * 0.12;
+
+            const margin = item.pixelSize * 6;
+            if (item.x < margin) {
+              item.x = margin;
+              item.vx = Math.abs(item.vx);
+            } else if (item.x > width - margin) {
+              item.x = width - margin;
+              item.vx = -Math.abs(item.vx);
+            }
+            if (item.y < margin) {
+              item.y = margin;
+              item.vy = Math.abs(item.vy);
+            } else if (item.y > height - margin) {
+              item.y = height - margin;
+              item.vy = -Math.abs(item.vy);
+            }
+          }
+
+          drawPixelSprite(ctx, item, spriteAlpha);
         }
       }
 

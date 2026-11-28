@@ -44,6 +44,18 @@ export const APP_THEMES: AppThemeOption[] = [
     isDark: false,
     swatches: ['#f5f2ff', '#ffffff', '#7c3aed'],
   },
+  {
+    id: 'retro-8bit',
+    label: '8-Bit Retro',
+    isDark: true,
+    swatches: ['#121426', '#1c203c', '#ef4444'],
+  },
+  {
+    id: 'pixel-cafe',
+    label: 'Pixel Art Cafe',
+    isDark: false,
+    swatches: ['#fbf4e9', '#fffaf3', '#c26d27'],
+  },
 ];
 
 export function resolveThemeState(

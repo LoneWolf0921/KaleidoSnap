@@ -20,7 +20,7 @@ interface BoothViewProps {
   soundEnabled: boolean;
   theme: ThemeMode;
   retakeIndex: number | null;
-  onSelectLayout: (id: LayoutId) => void;
+  onSelectLayout: (id: LayoutId, preservedFrames?: CapturedFrame[]) => void;
   onFrameCaptured: (frame: CapturedFrame) => void;
   onSequenceComplete: () => void;
   onCancelRetake: () => void;
@@ -77,6 +77,9 @@ export function BoothView({
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [pendingLayoutId, setPendingLayoutId] = useState<LayoutId | null>(null);
+  const [selectedKeepIndices, setSelectedKeepIndices] = useState<number[]>([]);
+  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
   const cancelRef = useRef(false);
 
   useEffect(() => {
@@ -91,16 +94,21 @@ export function BoothView({
     setCaptureError(null);
     setIsCapturing(true);
 
+    const filledSet = new Set(frames.map((f) => f.slotIndex));
+    const allSlots = Array.from({ length: layout.shotCount }, (_, i) => i);
+    const missingSlots = allSlots.filter((i) => !filledSet.has(i));
     const targetSlots =
       retakeIndex !== null
         ? [retakeIndex]
-        : Array.from({ length: layout.shotCount }, (_, i) => i);
+        : missingSlots.length > 0 && missingSlots.length < layout.shotCount
+          ? missingSlots
+          : allSlots;
 
     try {
       for (let i = 0; i < targetSlots.length; i++) {
         if (cancelRef.current) break;
         const slotIndex = targetSlots[i];
-        setCurrentShotNumber(i + 1);
+        setCurrentShotNumber(retakeIndex !== null ? 1 : slotIndex + 1);
         setActiveSlotIndex(slotIndex);
 
         for (let sec = countdownSeconds; sec >= 1; sec--) {
@@ -142,8 +150,114 @@ export function BoothView({
     setIsCapturing(false);
   }
 
+  function handleFormatClick(nextId: LayoutId): void {
+    if (nextId === layoutId) return;
+    if (frames.length === 0) {
+      onSelectLayout(nextId, []);
+      return;
+    }
+    const maxKeep = LAYOUTS[nextId].shotCount;
+    setSelectedKeepIndices(frames.slice(0, maxKeep).map((f) => f.slotIndex));
+    setPendingLayoutId(nextId);
+  }
+
+  function handleToggleKeepSlot(slotIndex: number): void {
+    if (!pendingLayoutId) return;
+    const maxKeep = LAYOUTS[pendingLayoutId].shotCount;
+    setSelectedKeepIndices((prev) => {
+      if (prev.includes(slotIndex)) {
+        return prev.filter((i) => i !== slotIndex);
+      }
+      if (maxKeep === 1) {
+        return [slotIndex];
+      }
+      if (prev.length >= maxKeep) {
+        return [...prev.slice(1), slotIndex];
+      }
+      return [...prev, slotIndex];
+    });
+  }
+
+  function handleConfirmLayoutSwitch(keepSelected: boolean): void {
+    if (!pendingLayoutId) return;
+    const preserved = keepSelected
+      ? frames.filter((f) => selectedKeepIndices.includes(f.slotIndex))
+      : [];
+    onSelectLayout(pendingLayoutId, preserved);
+    setPendingLayoutId(null);
+    setSelectedKeepIndices([]);
+  }
+
   const warmthOverlay = getWarmthOverlayColor(calibration.warmth);
   const totalInRun = retakeIndex !== null ? 1 : layout.shotCount;
+  const filledSlotSet = new Set(frames.map((f) => f.slotIndex));
+  const remainingCount = Array.from({ length: layout.shotCount }, (_, i) => i).filter(
+    (i) => !filledSlotSet.has(i)
+  ).length;
+  const allSlotsFull = retakeIndex === null && remainingCount === 0;
+
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandlerRef.current = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      if (overwriteConfirmOpen) {
+        e.preventDefault();
+        setOverwriteConfirmOpen(false);
+        return;
+      }
+      if (pendingLayoutId !== null) {
+        e.preventDefault();
+        setPendingLayoutId(null);
+        setSelectedKeepIndices([]);
+        return;
+      }
+      if (document.querySelector('[role="dialog"], [role="menu"]')) {
+        return;
+      }
+      if (isCapturing) {
+        e.preventDefault();
+        handleStopCapture();
+      }
+      return;
+    }
+
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (overwriteConfirmOpen || pendingLayoutId !== null) return;
+      if (document.querySelector('[role="dialog"], [role="menu"]')) return;
+      if (!camera.isReady || isCapturing) return;
+
+      const activeEl = document.activeElement;
+      if (activeEl instanceof HTMLElement) {
+        const tag = activeEl.tagName;
+        if (
+          tag === 'INPUT' ||
+          tag === 'SELECT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'BUTTON' ||
+          tag === 'A' ||
+          activeEl.isContentEditable ||
+          activeEl.closest('button, a, input, select, textarea, [role="button"], [role="menu"]')
+        ) {
+          return;
+        }
+      }
+
+      e.preventDefault();
+      if (allSlotsFull) {
+        setOverwriteConfirmOpen(true);
+      } else {
+        void runCountdownAndCapture();
+      }
+    }
+  };
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      keyHandlerRef.current(e);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const slotGridClass =
     layoutId === 'single'
@@ -171,7 +285,7 @@ export function BoothView({
           </div>
         )}
 
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-[var(--ks-border-strong)] bg-[#0D0C0B] lg:aspect-auto lg:min-h-0 lg:flex-1">
+        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border border-[var(--ks-border-strong)] bg-[#0D0C0B] sm:aspect-[4/3] lg:aspect-auto lg:min-h-0 lg:flex-1">
           {camera.error ? (
             <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center text-stone-200">
               <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-[var(--ks-accent)]">
@@ -219,12 +333,18 @@ export function BoothView({
                 />
               )}
 
-              {/* Optical viewfinder corner reticles */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-3">
+              {/* Optical viewfinder corner reticles + slot framing guide */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-3 flex items-center justify-center">
                 <span className="absolute top-0 left-0 h-3.5 w-3.5 border-t border-l border-white/30" />
                 <span className="absolute top-0 right-0 h-3.5 w-3.5 border-t border-r border-white/30" />
                 <span className="absolute bottom-0 left-0 h-3.5 w-3.5 border-b border-l border-white/30" />
                 <span className="absolute right-0 bottom-0 h-3.5 w-3.5 border-r border-b border-white/30" />
+                <div
+                  className="h-[88%] max-w-[90%] rounded-sm border border-dashed border-white/25"
+                  style={{
+                    aspectRatio: `${layout.slots[0].width} / ${layout.slots[0].height}`,
+                  }}
+                />
               </div>
 
               <div className="pointer-events-none absolute top-4 left-4 flex items-center gap-1.5">
@@ -284,32 +404,52 @@ export function BoothView({
           </p>
         )}
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-3">
           {isCapturing ? (
-            <button
-              type="button"
-              onClick={handleStopCapture}
-              className="inline-flex min-h-[44px] items-center rounded-md border border-[var(--ks-border-strong)] bg-[var(--ks-recessed)] px-5 py-2 text-xs font-semibold tracking-wide text-[var(--ks-ink)] transition hover:opacity-90"
-            >
-              Cancel
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!camera.isReady}
-              onClick={() => void runCountdownAndCapture()}
-              className="inline-flex min-h-[44px] items-center gap-2.5 rounded-md bg-[var(--ks-accent)] px-6 py-2.5 text-xs font-semibold tracking-wide text-white transition hover:bg-[var(--ks-accent-hover)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <span
-                aria-hidden="true"
-                className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/80"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+            <>
+              <span className="hidden font-mono text-[11px] text-[var(--ks-muted)] sm:inline">
+                Esc to cancel
               </span>
-              {retakeIndex !== null
-                ? `Retake #${String(retakeIndex + 1).padStart(2, '0')}`
-                : `Capture ${layout.shotCount} Shot${layout.shotCount > 1 ? 's' : ''}`}
-            </button>
+              <button
+                type="button"
+                onClick={handleStopCapture}
+                className="inline-flex min-h-[44px] items-center rounded-md border border-[var(--ks-border-strong)] bg-[var(--ks-recessed)] px-5 py-2 text-xs font-semibold tracking-wide text-[var(--ks-ink)] transition hover:opacity-90"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              {camera.isReady && (
+                <span className="hidden font-mono text-[11px] text-[var(--ks-muted)] sm:inline">
+                  Space / Enter to capture
+                </span>
+              )}
+              <button
+                type="button"
+                disabled={!camera.isReady}
+                onClick={() => {
+                  if (allSlotsFull) {
+                    setOverwriteConfirmOpen(true);
+                  } else {
+                    void runCountdownAndCapture();
+                  }
+                }}
+                className="inline-flex min-h-[44px] items-center gap-2.5 rounded-md bg-[var(--ks-accent)] px-6 py-2.5 text-xs font-semibold tracking-wide text-white transition hover:bg-[var(--ks-accent-hover)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/80"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                </span>
+                {retakeIndex !== null
+                  ? `Retake #${String(retakeIndex + 1).padStart(2, '0')}`
+                  : remainingCount > 0 && remainingCount < layout.shotCount
+                    ? `Capture ${remainingCount} More Shot${remainingCount > 1 ? 's' : ''}`
+                    : `Capture ${layout.shotCount} Shot${layout.shotCount > 1 ? 's' : ''}`}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -332,7 +472,7 @@ export function BoothView({
                     type="button"
                     aria-pressed={selected}
                     disabled={isCapturing || retakeIndex !== null}
-                    onClick={() => onSelectLayout(item.id)}
+                    onClick={() => handleFormatClick(item.id)}
                     className={`flex min-h-[44px] w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
                       selected
                         ? 'border-[var(--ks-accent)] bg-[var(--ks-accent-soft)] text-[var(--ks-ink)]'
@@ -409,6 +549,135 @@ export function BoothView({
           </section>
         </div>
       </aside>
+
+      {overwriteConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="overwrite-confirm-title"
+          onClick={() => setOverwriteConfirmOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-[var(--ks-border-strong)] bg-[var(--ks-surface)] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="overwrite-confirm-title" className="text-base font-bold text-[var(--ks-ink)]">
+              Overwrite existing photo{layout.shotCount > 1 ? 's' : ''}?
+            </h3>
+            <p className="mt-1.5 text-xs text-[var(--ks-muted)]">
+              All {layout.shotCount} slot{layout.shotCount > 1 ? 's' : ''} in{' '}
+              <strong className="text-[var(--ks-ink)]">{layout.label}</strong> are already filled.
+              Capturing again will replace your current photo{layout.shotCount > 1 ? 's' : ''}.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOverwriteConfirmOpen(false)}
+                className="inline-flex min-h-[40px] items-center rounded-md border border-[var(--ks-border)] px-3.5 py-2 text-xs font-semibold text-[var(--ks-ink)] transition hover:bg-[var(--ks-recessed)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOverwriteConfirmOpen(false);
+                  void runCountdownAndCapture();
+                }}
+                className="inline-flex min-h-[40px] items-center rounded-md bg-[var(--ks-accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--ks-accent-hover)]"
+              >
+                Overwrite &amp; Capture
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingLayoutId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="switch-format-title"
+          onClick={() => setPendingLayoutId(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-[var(--ks-border-strong)] bg-[var(--ks-surface)] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="switch-format-title" className="text-base font-bold text-[var(--ks-ink)]">
+              Switch to {LAYOUTS[pendingLayoutId].label}?
+            </h3>
+            <p className="mt-1 text-xs text-[var(--ks-muted)]">
+              You have {frames.length} captured shot{frames.length > 1 ? 's' : ''}. Select up to{' '}
+              {LAYOUTS[pendingLayoutId].shotCount} shot{LAYOUTS[pendingLayoutId].shotCount > 1 ? 's' : ''} to
+              preserve, or clear all and start fresh.
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {frames.map((frame) => {
+                const isKept = selectedKeepIndices.includes(frame.slotIndex);
+                return (
+                  <button
+                    key={frame.slotIndex}
+                    type="button"
+                    aria-pressed={isKept}
+                    onClick={() => handleToggleKeepSlot(frame.slotIndex)}
+                    className={`relative aspect-square overflow-hidden rounded-lg border-2 transition ${
+                      isKept
+                        ? 'border-[var(--ks-accent)] ring-2 ring-[var(--ks-accent)]/30'
+                        : 'border-[var(--ks-border)] opacity-55 hover:opacity-85'
+                    }`}
+                  >
+                    <img
+                      src={frame.dataUrl}
+                      alt={`Shot ${frame.slotIndex + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute top-1 left-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
+                      #{String(frame.slotIndex + 1).padStart(2, '0')}
+                    </span>
+                    <span
+                      className={`absolute right-1 bottom-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                        isKept
+                          ? 'bg-[var(--ks-accent)] text-white'
+                          : 'border border-white/70 bg-black/40 text-transparent'
+                      }`}
+                    >
+                      &#10003;
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingLayoutId(null)}
+                className="inline-flex min-h-[40px] items-center rounded-md border border-[var(--ks-border)] px-3.5 py-2 text-xs font-semibold text-[var(--ks-ink)] transition hover:bg-[var(--ks-recessed)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmLayoutSwitch(false)}
+                className="inline-flex min-h-[40px] items-center rounded-md border border-red-500/40 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-500/20 dark:text-red-300"
+              >
+                Clear All
+              </button>
+              <button
+                type="button"
+                disabled={selectedKeepIndices.length === 0}
+                onClick={() => handleConfirmLayoutSwitch(true)}
+                className="inline-flex min-h-[40px] items-center rounded-md bg-[var(--ks-accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--ks-accent-hover)] disabled:opacity-45"
+              >
+                Keep {selectedKeepIndices.length} &amp; Switch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

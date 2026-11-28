@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { playThemeInteractionSound } from '../audio/boothAudio';
+import { formatStripDate } from '../compositor/canvasCompositor';
 import { APP_THEMES } from '../config/themes';
-import type { BoothSettings } from '../types/booth';
+import type { BoothSettings, DateFormatId } from '../types/booth';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -13,6 +14,14 @@ interface SettingsModalProps {
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+const DATE_FORMAT_OPTIONS: ReadonlyArray<{ id: DateFormatId; label: string }> = [
+  { id: 'mm.dd.yyyy', label: 'MM.DD.YYYY' },
+  { id: 'mm-dd-yyyy', label: 'MM-DD-YYYY' },
+  { id: 'dd.mm.yyyy', label: 'DD.MM.YYYY' },
+  { id: 'yyyy-mm-dd', label: 'YYYY-MM-DD' },
+  { id: 'short-month', label: 'Mon DD, YYYY' },
+];
 
 export function SettingsModal({
   isOpen,
@@ -124,7 +133,7 @@ export function SettingsModal({
             <span className="mb-2 block font-mono text-[11px] font-semibold tracking-wider text-[var(--ks-muted)] uppercase">
               App Theme
             </span>
-            <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="App Theme">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-1.5" role="group" aria-label="App Theme">
               {APP_THEMES.map((t) => {
                 const active = settings.theme === t.id;
                 return (
@@ -136,13 +145,13 @@ export function SettingsModal({
                       onUpdate({ theme: t.id });
                       playThemeInteractionSound(t.id, settings.soundEnabled);
                     }}
-                    className={`flex min-h-[44px] items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left text-xs font-semibold transition ${
+                    className={`flex min-h-[44px] min-w-0 items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs font-semibold transition ${
                       active
                         ? 'border-[var(--ks-accent)] bg-[var(--ks-accent-soft)] text-[var(--ks-ink)]'
                         : 'border-[var(--ks-border)] text-[var(--ks-muted)] hover:border-[var(--ks-border-strong)] hover:text-[var(--ks-ink)]'
                     }`}
                   >
-                    <span className="truncate">{t.label}</span>
+                    <span className="min-w-0 truncate">{t.label}</span>
                     <span aria-hidden="true" className="flex shrink-0 -space-x-1">
                       {t.swatches.map((hex, i) => (
                         <span
@@ -255,6 +264,27 @@ export function SettingsModal({
                 }`}
               />
             </button>
+          </div>
+
+          <div className="py-4">
+            <label
+              htmlFor="date-format-select"
+              className="mb-2 block font-mono text-[11px] font-semibold tracking-wider text-[var(--ks-muted)] uppercase"
+            >
+              Date Stamp Format
+            </label>
+            <select
+              id="date-format-select"
+              value={settings.dateFormat}
+              onChange={(e) => onUpdate({ dateFormat: e.target.value as DateFormatId })}
+              className="min-h-[44px] w-full rounded-md border border-[var(--ks-border)] bg-[var(--ks-bg)] px-3 py-2 text-xs font-medium text-[var(--ks-ink)] sm:text-sm"
+            >
+              {DATE_FORMAT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label} ({formatStripDate(new Date(), opt.id)})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="pt-4">

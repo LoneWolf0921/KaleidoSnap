@@ -13,8 +13,10 @@ import {
 import type {
   BoothSettings,
   CapturedFrame,
+  DateFormatId,
   FilterCalibration,
   FilterId,
+  FooterFontStyle,
   LayoutId,
   PlacedSticker,
   SessionRecord,
@@ -31,6 +33,14 @@ import { SplashView } from './ui/SplashView';
 
 const SETTINGS_STORAGE_KEY = 'kaleidosnap-settings-v1';
 
+const VALID_DATE_FORMATS: ReadonlySet<DateFormatId> = new Set([
+  'mm.dd.yyyy',
+  'mm-dd-yyyy',
+  'dd.mm.yyyy',
+  'yyyy-mm-dd',
+  'short-month',
+]);
+
 const DEFAULT_SETTINGS: BoothSettings = {
   exportFormat: 'png',
   jpegQuality: 0.92,
@@ -39,6 +49,7 @@ const DEFAULT_SETTINGS: BoothSettings = {
   mirrorCamera: true,
   soundEnabled: true,
   animationsEnabled: true,
+  dateFormat: 'mm.dd.yyyy',
   ttlMs: DEFAULT_SESSION_TTL_MS,
   selectedDeviceId: null,
 };
@@ -49,10 +60,15 @@ function loadSettings(): BoothSettings {
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<BoothSettings> & { theme?: string };
     const { dataTheme } = resolveThemeState(parsed.theme ?? DEFAULT_SETTINGS.theme);
+    const dateFormat =
+      parsed.dateFormat && VALID_DATE_FORMATS.has(parsed.dateFormat)
+        ? parsed.dateFormat
+        : DEFAULT_SETTINGS.dateFormat;
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
       theme: dataTheme,
+      dateFormat,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -69,6 +85,7 @@ function createEmptySession(layoutId: LayoutId = 'strip-3', ttlMs = DEFAULT_SESS
     calibration: getFilterPreset('normal').calibration,
     frameId: FRAME_PRESETS[0].id,
     footerText: 'KaleidoSnap',
+    footerFont: 'modern',
     showDate: true,
     stickers: [],
     createdAt: now,
@@ -163,8 +180,12 @@ export function App() {
     });
   }
 
-  function handleSelectLayout(layoutId: LayoutId): void {
-    persistSession(createEmptySession(layoutId, settings.ttlMs));
+  function handleSelectLayout(layoutId: LayoutId, preservedFrames: CapturedFrame[] = []): void {
+    const empty = createEmptySession(layoutId, settings.ttlMs);
+    const reindexed = preservedFrames
+      .slice(0, LAYOUTS[layoutId].shotCount)
+      .map((frame, idx) => ({ ...frame, slotIndex: idx }));
+    persistSession({ ...empty, frames: reindexed });
     setRetakeIndex(null);
   }
 
@@ -203,6 +224,28 @@ export function App() {
   function handleRetakeSlot(slotIndex: number): void {
     setRetakeIndex(slotIndex);
     setView('booth');
+  }
+
+  function handleSwapFrames(indexA: number, indexB: number): void {
+    if (indexA === indexB) return;
+    const hasEither = session.frames.some(
+      (f) => f.slotIndex === indexA || f.slotIndex === indexB
+    );
+    if (!hasEither) return;
+
+    const nextFrames = session.frames
+      .map((f) => {
+        if (f.slotIndex === indexA) return { ...f, slotIndex: indexB };
+        if (f.slotIndex === indexB) return { ...f, slotIndex: indexA };
+        return f;
+      })
+      .sort((a, b) => a.slotIndex - b.slotIndex);
+
+    persistSession({ ...session, frames: nextFrames });
+  }
+
+  function handleUpdateFooterFont(footerFont: FooterFontStyle): void {
+    persistSession({ ...session, footerFont });
   }
 
   function handleAddSticker(stickerId: string, x = 0.5, y = 0.5): void {
@@ -345,20 +388,20 @@ export function App() {
         </div>
 
         {/* Top-Right: Theme + Sound + Settings Pills */}
-        <div className="relative flex flex-wrap items-center gap-2">
+        <div className="relative flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
           <div ref={themeMenuRef} className="relative">
             <button
               type="button"
               onClick={() => setThemeMenuOpen((prev) => !prev)}
               aria-expanded={themeMenuOpen}
               aria-label="Switch app theme"
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-[var(--ks-border-strong)] bg-[var(--ks-surface)]/90 px-3.5 text-xs font-semibold text-[var(--ks-ink)] shadow-sm backdrop-blur-md transition hover:border-[var(--ks-accent)] active:scale-[0.98]"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-[var(--ks-border-strong)] bg-[var(--ks-surface)]/90 px-3 text-xs font-semibold text-[var(--ks-ink)] shadow-sm backdrop-blur-md transition hover:border-[var(--ks-accent)] active:scale-[0.98] sm:gap-2 sm:px-3.5"
             >
               <span
                 aria-hidden="true"
-                className="h-3 w-3 rounded-full border border-black/15 bg-[var(--ks-accent)]"
+                className="h-3 w-3 shrink-0 rounded-full border border-black/15 bg-[var(--ks-accent)]"
               />
-              <span>
+              <span className="max-w-[96px] truncate sm:max-w-none">
                 {APP_THEMES.find((t) => t.id === resolveThemeState(settings.theme).dataTheme)?.label ?? 'Theme'}
               </span>
             </button>
@@ -367,7 +410,7 @@ export function App() {
               <div
                 role="menu"
                 aria-label="Quick Theme Switcher"
-                className="absolute right-0 top-full z-40 mt-2 w-52 rounded-xl border border-[var(--ks-border-strong)] bg-[var(--ks-surface)] p-1.5 shadow-2xl"
+                className="fixed inset-x-4 top-[116px] z-50 rounded-xl border border-[var(--ks-border-strong)] bg-[var(--ks-surface)] p-1.5 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:z-40 sm:mt-2 sm:w-52"
               >
                 {APP_THEMES.map((t) => {
                   const active = resolveThemeState(settings.theme).dataTheme === t.id;
@@ -472,6 +515,7 @@ export function App() {
               calibration={session.calibration}
               frameId={session.frameId}
               footerText={session.footerText}
+              footerFont={session.footerFont ?? 'modern'}
               showDate={session.showDate}
               stickers={session.stickers}
               settings={settings}
@@ -480,11 +524,13 @@ export function App() {
               onUpdateCalibration={handleUpdateCalibration}
               onSelectFrame={(frameId) => persistSession({ ...session, frameId })}
               onUpdateFooterText={(footerText) => persistSession({ ...session, footerText })}
+              onUpdateFooterFont={handleUpdateFooterFont}
               onToggleDate={(showDate) => persistSession({ ...session, showDate })}
               onAddSticker={handleAddSticker}
               onUpdateSticker={handleUpdateSticker}
               onRemoveSticker={handleRemoveSticker}
               onRetakeSlot={handleRetakeSlot}
+              onSwapFrames={handleSwapFrames}
               onBackToBooth={() => setView('booth')}
             />
           )}

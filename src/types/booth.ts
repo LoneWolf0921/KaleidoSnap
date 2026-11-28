@@ -28,7 +28,11 @@ export type FramePattern =
   | 'film-sprocket'
   | 'matcha-botanical'
   | 'midnight-starry'
-  | 'sketchbook-doodle';
+  | 'sketchbook-doodle'
+  | 'pixel-8bit'
+  | 'pixel-cafe'
+  | 'holo-gradient'
+  | 'polaroid-tape';
 
 export interface FrameStyle {
   id: string;
@@ -70,7 +74,12 @@ export type StickerCategory =
   | 'critters'
   | 'arcade'
   | 'stamps'
-  | 'doodles';
+  | 'doodles'
+  | 'props'
+  | 'food'
+  | 'y2k'
+  | 'nature'
+  | 'scrapbook';
 
 export interface StickerPath {
   d: string;
@@ -106,13 +115,26 @@ export interface CapturedFrame {
 }
 
 export type ExportFormat = 'jpeg' | 'png';
+export type PaperSizeId = '3r' | '4x6' | '5x7' | 'a4' | 'letter' | '2x6';
+export type DateFormatId = 'mm.dd.yyyy' | 'mm-dd-yyyy' | 'dd.mm.yyyy' | 'yyyy-mm-dd' | 'short-month';
+export type FooterFontStyle = 'modern' | 'mono' | 'handwritten';
+
+export interface PrintPaperSpec {
+  id: PaperSizeId;
+  label: string;
+  widthIn: number;
+  heightIn: number;
+  description: string;
+}
 export type ThemeMode =
   | 'light'
   | 'dark'
   | 'pink-neko'
   | 'midnight-arcade'
   | 'matcha-cream'
-  | 'lavender-soda';
+  | 'lavender-soda'
+  | 'retro-8bit'
+  | 'pixel-cafe';
 export type StorageMode = 'indexeddb' | 'memory-fallback';
 
 export interface BoothSettings {
@@ -123,6 +145,7 @@ export interface BoothSettings {
   mirrorCamera: boolean;
   soundEnabled: boolean;
   animationsEnabled: boolean;
+  dateFormat: DateFormatId;
   ttlMs: number;
   selectedDeviceId: string | null;
 }
@@ -135,6 +158,7 @@ export interface SessionRecord {
   calibration: FilterCalibration;
   frameId: string;
   footerText: string;
+  footerFont?: FooterFontStyle;
   showDate: boolean;
   stickers: PlacedSticker[];
   createdAt: number;

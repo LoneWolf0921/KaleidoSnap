@@ -1,7 +1,13 @@
 import type { StickerCategory, StickerDef } from '../types/booth';
+import { STICKERS_V2 } from './stickersV2';
 
 export const STICKER_CATEGORIES: { id: 'all' | StickerCategory; label: string }[] = [
   { id: 'all', label: 'All' },
+  { id: 'props', label: 'Props' },
+  { id: 'food', label: 'Food' },
+  { id: 'y2k', label: 'Y2K' },
+  { id: 'nature', label: 'Nature' },
+  { id: 'scrapbook', label: 'Scrapbook' },
   { id: 'expressions', label: 'Expressions' },
   { id: 'doodles', label: 'Doodles' },
   { id: 'sparkles', label: 'Sparkles' },
@@ -10,7 +16,7 @@ export const STICKER_CATEGORIES: { id: 'all' | StickerCategory; label: string }[
   { id: 'stamps', label: 'Stamps' },
 ];
 
-export const STICKERS: StickerDef[] = [
+const STICKERS_V1: StickerDef[] = [
   // ── Manga & Doodle Expressions (10) ──────────────────────────────────────
   {
     id: 'shock-aura',
@@ -854,6 +860,8 @@ export const STICKERS: StickerDef[] = [
     ],
   },
 ];
+
+export const STICKERS: StickerDef[] = [...STICKERS_V1, ...STICKERS_V2];
 
 export function getStickerById(stickerId: string): StickerDef | undefined {
   return STICKERS.find((s) => s.id === stickerId);

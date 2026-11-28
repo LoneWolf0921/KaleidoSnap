@@ -165,6 +165,42 @@ export const FRAME_PRESETS: FrameStyle[] = [
     slotRadius: 14,
     pattern: 'sketchbook-doodle',
   },
+  {
+    id: 'pixel-8bit',
+    label: '8-Bit Pixel',
+    backgroundColor: '#121426',
+    textColor: '#FDE047',
+    accentColor: '#EF4444',
+    slotRadius: 0,
+    pattern: 'pixel-8bit',
+  },
+  {
+    id: 'pixel-cafe',
+    label: 'Pixel Cafe',
+    backgroundColor: '#FBF4E9',
+    textColor: '#4A2C18',
+    accentColor: '#C26D27',
+    slotRadius: 8,
+    pattern: 'pixel-cafe',
+  },
+  {
+    id: 'holo-gradient',
+    label: 'Holo Gradient',
+    backgroundColor: '#F3E8FF',
+    textColor: '#3B1D5E',
+    accentColor: '#C084FC',
+    slotRadius: 20,
+    pattern: 'holo-gradient',
+  },
+  {
+    id: 'polaroid-tape',
+    label: 'Polaroid Tape',
+    backgroundColor: '#F7F3EA',
+    textColor: '#292524',
+    accentColor: '#D6B88D',
+    slotRadius: 6,
+    pattern: 'polaroid-tape',
+  },
 ];
 
 export function getFrameById(frameId: string): FrameStyle {

@@ -79,7 +79,7 @@ export function useCameraController(
           audio: false,
           video: {
             width: { ideal: 1280 },
-            height: { ideal: 720 },
+            height: { ideal: 960 },
             ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: 'user' }),
           },
         };
